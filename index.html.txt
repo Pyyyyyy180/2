@@ -1,0 +1,167 @@
+data:text/html,<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>模擬書法小遊戲（支援 Apple Pencil / 手指 / 滑鼠）</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: sans-serif;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      margin-top: 20px;
+    }
+    #btn-save, #btn-clear {
+      margin: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: background-color 0.3s, transform 0.1s;
+    }
+    #btn-save:hover, #btn-clear:hover {
+      background-color: #45a049;
+    }
+    #btn-save:active, #btn-clear:active {
+      transform: scale(0.97);
+    }
+    #size-slider {
+      margin: 10px;
+    }
+    #debug {
+      width: 90%;
+      font-size: 14px;
+      color: red;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>模擬書法小遊戲（支援 Apple Pencil / 手指 / 滑鼠）</h1>
+  <canvas id="canvas" width="300" height="300"></canvas>
+  <label for="size-slider">筆粗：</label>
+  <input type="range" id="size-slider" min="1" max="20" value="8">
+  <button id="btn-save">儲存圖片</button>
+  <button id="btn-clear">清空畫布</button>
+  <div id="debug"></div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const sizeSlider = document.getElementById('size-slider');
+    const debugDiv = document.getElementById('debug');
+
+    function log(msg) {
+      debugDiv.innerText = msg;
+    }
+
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function getCanvasPos(touch) {
+      const rect = canvas.getBoundingClientRect();
+      return [touch.clientX - rect.left, touch.clientY - rect.top];
+    }
+
+    // pointer事件（支援滑鼠、Apple Pencil）
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      isDrawing = true;
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+      log('pointerdown - pressure: ' + (e.pressure || 0));
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const pressure = e.pressure || 0.5;
+      const size = parseFloat(sizeSlider.value) * pressure;
+
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = size;
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.stroke();
+
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      isDrawing = false;
+      log('pointerup');
+    });
+
+    canvas.addEventListener('pointerout', () => {
+      isDrawing = false;
+      log('pointerout');
+    });
+
+    // touch事件（後備支援 iPad Safari）
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const [x, y] = getCanvasPos(touch);
+      isDrawing = true;
+      [lastX, lastY] = [x, y];
+      log('touchstart');
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const [x, y] = getCanvasPos(touch);
+
+      const size = parseFloat(sizeSlider.value) * 0.5; // 無筆壓，用固定壓力模擬
+
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = size;
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+
+      [lastX, lastY] = [x, y];
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+      isDrawing = false;
+      log('touchend');
+    });
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'handwriting.png';
+      link.href = canvas.toDataURL();
+      link.click();
+      log('圖片已儲存');
+    });
+
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      log('畫布已清空');
+    });
+  </script>
+</body>
+</html>
+
