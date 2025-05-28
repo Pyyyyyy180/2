@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>模擬書法小遊戲（</title>
+  <meta charset="UTF-8"> <!-- 設定編碼，支援中文 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- 手機裝置響應式設定 -->
+  <title>模擬書法小遊戲</title>
   <style>
+    /* 基本頁面樣式設定 */
     body {
       margin: 0;
       display: flex;
@@ -12,13 +13,17 @@
       align-items: center;
       font-family: sans-serif;
     }
+
+    /* 畫布樣式 */
     canvas {
-      border: 1px solid #ccc;
-      touch-action: none;
-      -webkit-touch-callout: none;
+      border: 1px solid #ccc;       /* 畫布邊框 */
+      touch-action: none;           /* 禁止預設觸控動作（如滾動） */
+      -webkit-touch-callout: none;  /* 禁止選取（for iOS） */
       -webkit-user-select: none;
       margin-top: 20px;
     }
+
+    /* 儲存與清空按鈕樣式 */
     #btn-save, #btn-clear {
       margin: 20px;
       padding: 10px 20px;
@@ -31,136 +36,137 @@
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       transition: background-color 0.3s, transform 0.1s;
     }
+
+    /* 滑鼠移上與按下按鈕時的效果 */
     #btn-save:hover, #btn-clear:hover {
       background-color: #45a049;
     }
+
     #btn-save:active, #btn-clear:active {
       transform: scale(0.97);
     }
+
+    /* 筆粗滑桿位置 */
     #size-slider {
       margin: 10px;
-    }
-    #debug {
-      width: 90%;
-      font-size: 14px;
-      color: red;
-      margin-top: 10px;
     }
   </style>
 </head>
 <body>
+
+  <!-- 畫布與控制元件 -->
   <h1>模擬書法小遊戲</h1>
-  <canvas id="canvas" width="300" height="300"></canvas>
+  <canvas id="canvas" width="400" height="400"></canvas>
+
   <label for="size-slider">筆粗：</label>
-  <input type="range" id="size-slider" min="1" max="20" value="8">
+  <input type="range" id="size-slider" min="2" max="20" value="10">
+
   <button id="btn-save">儲存圖片</button>
   <button id="btn-clear">清空畫布</button>
-  <div id="debug" style="color: red; font-size: 14px; margin-top: 10px;"></div>
-
 
   <script>
+    // 取得畫布與控制元件
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const sizeSlider = document.getElementById('size-slider');
-    const debugDiv = document.getElementById('debug');
 
-    function log(msg) {
-      document.getElementById('debug').innerText = msg;
-    }
-
+    // 紀錄書寫狀態與位置
     let isDrawing = false;
     let lastX = 0;
     let lastY = 0;
+    let lastTime = 0;
 
+    // 將觸控位置轉為畫布座標
     function getCanvasPos(touch) {
       const rect = canvas.getBoundingClientRect();
       return [touch.clientX - rect.left, touch.clientY - rect.top];
     }
 
-    // pointer事件（支援滑鼠、Apple Pencil）
-    canvas.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
+    // 開始書寫（記錄初始位置與時間）
+    function startDrawing(x, y) {
       isDrawing = true;
-      [lastX, lastY] = [e.offsetX, e.offsetY];
-      log('pointerdown - pressure: ' + (e.pressure || 0));
-    });
+      lastX = x;
+      lastY = y;
+      lastTime = performance.now(); // 紀錄時間用於模擬筆壓
+    }
 
-    canvas.addEventListener('pointermove', (e) => {
-      if (!isDrawing) return;
-      e.preventDefault();
-      const pressure = e.pressure || 0.5;
-      const size = parseFloat(sizeSlider.value) * pressure;
+    // 繪製筆劃（模擬筆壓根據速度）
+    function drawLine(x, y) {
+      const now = performance.now();
+      const dx = x - lastX;
+      const dy = y - lastY;
+      const dt = now - lastTime;
+
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const speed = distance / (dt || 1); // 避免除以0
+      const baseSize = parseFloat(sizeSlider.value);
+      const pressure = Math.max(0.15, Math.min(1, 1 - speed * 0.6)); // 速度慢→筆壓大
+      const lineWidth = baseSize * pressure;
 
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.strokeStyle = 'black';
-      ctx.lineWidth = size;
-
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
-      ctx.lineTo(e.offsetX, e.offsetY);
-      ctx.stroke();
-
-      [lastX, lastY] = [e.offsetX, e.offsetY];
-    });
-
-    canvas.addEventListener('pointerup', () => {
-      isDrawing = false;
-      log('pointerup');
-    });
-
-    canvas.addEventListener('pointerout', () => {
-      isDrawing = false;
-      log('pointerout');
-    });
-
-    // touch事件（後備支援 iPad Safari）
-    canvas.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const [x, y] = getCanvasPos(touch);
-      isDrawing = true;
-      [lastX, lastY] = [x, y];
-      log('touchstart（事件已觸發）');
-    });
-
-    canvas.addEventListener('touchmove', (e) => {
-      if (!isDrawing) return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      const [x, y] = getCanvasPos(touch);
-
-      const size = parseFloat(sizeSlider.value) * 0.5; // 無筆壓，用固定壓力模擬
-
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = size;
+      ctx.lineWidth = lineWidth;
 
       ctx.beginPath();
       ctx.moveTo(lastX, lastY);
       ctx.lineTo(x, y);
       ctx.stroke();
 
-      [lastX, lastY] = [x, y];
-    });
+      lastX = x;
+      lastY = y;
+      lastTime = now;
+    }
 
-    canvas.addEventListener('touchend', (e) => {
+    // 停止書寫
+    function stopDrawing() {
       isDrawing = false;
-      log('touchend');
+    }
+
+    // 🖱 支援滑鼠與 Apple Pencil 的 pointer 事件
+    canvas.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      startDrawing(e.offsetX, e.offsetY);
     });
 
+    canvas.addEventListener('pointermove', e => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      drawLine(e.offsetX, e.offsetY);
+    });
+
+    canvas.addEventListener('pointerup', stopDrawing);
+    canvas.addEventListener('pointerout', stopDrawing);
+
+    // 👉 補充支援 iPad Safari 的觸控事件
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const [x, y] = getCanvasPos(touch);
+      startDrawing(x, y);
+    });
+
+    canvas.addEventListener('touchmove', e => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const [x, y] = getCanvasPos(touch);
+      drawLine(x, y);
+    });
+
+    canvas.addEventListener('touchend', stopDrawing);
+
+    // 儲存畫布成 PNG 圖片
     document.getElementById('btn-save').addEventListener('click', () => {
       const link = document.createElement('a');
       link.download = 'handwriting.png';
       link.href = canvas.toDataURL();
       link.click();
-      log('圖片已儲存');
     });
 
+    // 清除畫布
     document.getElementById('btn-clear').addEventListener('click', () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      log('畫布已清空');
     });
   </script>
 </body>
