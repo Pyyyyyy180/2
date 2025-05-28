@@ -2,8 +2,8 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>模擬書法小遊戲</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自然筆壓書法小遊戲</title>
   <style>
     body {
       margin: 0;
@@ -15,8 +15,6 @@
     canvas {
       border: 1px solid #ccc;
       touch-action: none;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
       margin-top: 20px;
     }
     #btn-save, #btn-clear {
@@ -43,7 +41,7 @@
   </style>
 </head>
 <body>
-  <h1>模擬書法小遊戲</h1>
+  <h1>自然筆壓書法小遊戲</h1>
   <canvas id="canvas" width="400" height="400"></canvas>
   <label for="size-slider">筆粗：</label>
   <input type="range" id="size-slider" min="2" max="20" value="10">
@@ -59,8 +57,9 @@
     let lastX = 0;
     let lastY = 0;
     let lastTime = 0;
+    let currentPressure = 0.5;
 
-    // 取得畫布中的觸控點座標
+    // 工具函式：取得觸控點轉為畫布座標
     function getCanvasPos(touch) {
       const rect = canvas.getBoundingClientRect();
       return [touch.clientX - rect.left, touch.clientY - rect.top];
@@ -74,18 +73,21 @@
       lastTime = performance.now();
     }
 
-    // 寫線條：速度快則壓力小、線條細；速度慢則壓力大、線條粗
+    // 畫線，包含筆壓平滑處理
     function drawLine(x, y) {
       const now = performance.now();
+      const dt = now - lastTime;
       const dx = x - lastX;
       const dy = y - lastY;
-      const dt = now - lastTime;
-
       const distance = Math.sqrt(dx * dx + dy * dy);
       const speed = distance / (dt || 1);
+
       const baseSize = parseFloat(sizeSlider.value);
-      const pressure = Math.max(0.15, Math.min(1, 1 - speed * 0.6));
-      const lineWidth = baseSize * pressure;
+      const targetPressure = Math.max(0.15, Math.min(1, 1 - speed * 0.5));
+
+      // ✅ 筆壓平滑：慢慢趨近目標值
+      currentPressure += (targetPressure - currentPressure) * 0.2;
+      const lineWidth = baseSize * currentPressure;
 
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -106,7 +108,7 @@
       isDrawing = false;
     }
 
-    // 滑鼠／Apple Pencil 支援
+    // Pointer 事件：滑鼠 / Apple Pencil
     canvas.addEventListener('pointerdown', e => {
       e.preventDefault();
       startDrawing(e.offsetX, e.offsetY);
@@ -121,7 +123,7 @@
     canvas.addEventListener('pointerup', stopDrawing);
     canvas.addEventListener('pointerout', stopDrawing);
 
-    // 手指觸控支援（for iPad Safari）
+    // Touch 事件：iPad 手指支援
     canvas.addEventListener('touchstart', e => {
       e.preventDefault();
       const touch = e.touches[0];
@@ -139,7 +141,7 @@
 
     canvas.addEventListener('touchend', stopDrawing);
 
-    // 儲存畫布為圖片
+    // 儲存圖片功能
     document.getElementById('btn-save').addEventListener('click', () => {
       const link = document.createElement('a');
       link.download = 'handwriting.png';
@@ -147,7 +149,7 @@
       link.click();
     });
 
-    // 清除畫布
+    // 清除畫布功能
     document.getElementById('btn-clear').addEventListener('click', () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     });
