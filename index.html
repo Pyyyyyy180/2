@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>自然筆壓書法小遊戲</title>
+  <title>自然筆壓書法遊戲（含點筆修正）</title>
   <style>
     body {
       margin: 0;
@@ -41,7 +42,7 @@
   </style>
 </head>
 <body>
-  <h1>自然筆壓書法小遊戲</h1>
+  <h1>自然筆壓書法遊戲</h1>
   <canvas id="canvas" width="400" height="400"></canvas>
   <label for="size-slider">筆粗：</label>
   <input type="range" id="size-slider" min="2" max="20" value="10">
@@ -54,26 +55,25 @@
     const sizeSlider = document.getElementById('size-slider');
 
     let isDrawing = false;
-    let lastX = 0;
-    let lastY = 0;
+    let lastX = 0, lastY = 0;
+    let prevX = 0, prevY = 0;
     let lastTime = 0;
     let currentPressure = 0.5;
 
-    // 工具函式：取得觸控點轉為畫布座標
     function getCanvasPos(touch) {
       const rect = canvas.getBoundingClientRect();
       return [touch.clientX - rect.left, touch.clientY - rect.top];
     }
 
-    // 開始書寫
     function startDrawing(x, y) {
       isDrawing = true;
       lastX = x;
       lastY = y;
+      prevX = x;
+      prevY = y;
       lastTime = performance.now();
     }
 
-    // 畫線，包含筆壓平滑處理
     function drawLine(x, y) {
       const now = performance.now();
       const dt = now - lastTime;
@@ -81,11 +81,9 @@
       const dy = y - lastY;
       const distance = Math.sqrt(dx * dx + dy * dy);
       const speed = distance / (dt || 1);
-
       const baseSize = parseFloat(sizeSlider.value);
       const targetPressure = Math.max(0.15, Math.min(1, 1 - speed * 0.5));
 
-      // ✅ 筆壓平滑：慢慢趨近目標值
       currentPressure += (targetPressure - currentPressure) * 0.2;
       const lineWidth = baseSize * currentPressure;
 
@@ -104,11 +102,22 @@
       lastTime = now;
     }
 
-    function stopDrawing() {
+    function stopDrawing(x = lastX, y = lastY) {
+      if (isDrawing) {
+        const dx = x - prevX;
+        const dy = y - prevY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 2) {
+          const dotSize = parseFloat(sizeSlider.value) * 0.6;
+          ctx.beginPath();
+          ctx.arc(x, y, dotSize / 2, 0, Math.PI * 2);
+          ctx.fillStyle = 'black';
+          ctx.fill();
+        }
+      }
       isDrawing = false;
     }
 
-    // Pointer 事件：滑鼠 / Apple Pencil
     canvas.addEventListener('pointerdown', e => {
       e.preventDefault();
       startDrawing(e.offsetX, e.offsetY);
@@ -120,10 +129,9 @@
       drawLine(e.offsetX, e.offsetY);
     });
 
-    canvas.addEventListener('pointerup', stopDrawing);
-    canvas.addEventListener('pointerout', stopDrawing);
+    canvas.addEventListener('pointerup', e => stopDrawing(e.offsetX, e.offsetY));
+    canvas.addEventListener('pointerout', e => stopDrawing(e.offsetX, e.offsetY));
 
-    // Touch 事件：iPad 手指支援
     canvas.addEventListener('touchstart', e => {
       e.preventDefault();
       const touch = e.touches[0];
@@ -139,9 +147,12 @@
       drawLine(x, y);
     });
 
-    canvas.addEventListener('touchend', stopDrawing);
+    canvas.addEventListener('touchend', e => {
+      const touch = e.changedTouches[0];
+      const [x, y] = getCanvasPos(touch);
+      stopDrawing(x, y);
+    });
 
-    // 儲存圖片功能
     document.getElementById('btn-save').addEventListener('click', () => {
       const link = document.createElement('a');
       link.download = 'handwriting.png';
@@ -149,11 +160,9 @@
       link.click();
     });
 
-    // 清除畫布功能
     document.getElementById('btn-clear').addEventListener('click', () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     });
   </script>
 </body>
 </html>
-
