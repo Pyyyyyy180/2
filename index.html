@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>自然筆壓書法遊戲（含點筆修正）</title>
+  <title>毛筆書法模擬小遊戲（真實筆壓）</title>
   <style>
     body {
       margin: 0;
@@ -15,11 +14,11 @@
     }
     canvas {
       border: 1px solid #ccc;
-      touch-action: none;
+      touch-action: none; /* 禁用預設觸控行為 */
       margin-top: 20px;
     }
     #btn-save, #btn-clear {
-      margin: 20px;
+      margin: 10px;
       padding: 10px 20px;
       font-size: 16px;
       background-color: #4CAF50;
@@ -28,13 +27,9 @@
       border-radius: 8px;
       cursor: pointer;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      transition: background-color 0.3s, transform 0.1s;
     }
     #btn-save:hover, #btn-clear:hover {
       background-color: #45a049;
-    }
-    #btn-save:active, #btn-clear:active {
-      transform: scale(0.97);
     }
     #size-slider {
       margin: 10px;
@@ -42,12 +37,14 @@
   </style>
 </head>
 <body>
-  <h1>自然筆壓書法遊戲</h1>
+  <h2>毛筆書法模擬（支援筆壓）</h2>
   <canvas id="canvas" width="400" height="400"></canvas>
-  <label for="size-slider">筆粗：</label>
-  <input type="range" id="size-slider" min="2" max="20" value="10">
-  <button id="btn-save">儲存圖片</button>
-  <button id="btn-clear">清空畫布</button>
+  <label for="size-slider">最大筆粗：</label>
+  <input type="range" id="size-slider" min="2" max="30" value="10">
+  <div>
+    <button id="btn-save">儲存圖片</button>
+    <button id="btn-clear">清空畫布</button>
+  </div>
 
   <script>
     const canvas = document.getElementById('canvas');
@@ -56,106 +53,39 @@
 
     let isDrawing = false;
     let lastX = 0, lastY = 0;
-    let prevX = 0, prevY = 0;
-    let lastTime = 0;
-    let currentPressure = 0.5;
 
-    function getCanvasPos(touch) {
-      const rect = canvas.getBoundingClientRect();
-      return [touch.clientX - rect.left, touch.clientY - rect.top];
-    }
-
-    function startDrawing(x, y) {
+    canvas.addEventListener('pointerdown', (e) => {
       isDrawing = true;
-      lastX = x;
-      lastY = y;
-      prevX = x;
-      prevY = y;
-      lastTime = performance.now();
-    }
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    });
 
-    function drawLine(x, y) {
-      const now = performance.now();
-      const dt = now - lastTime;
-      const dx = x - lastX;
-      const dy = y - lastY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const speed = distance / (dt || 1);
-      const baseSize = parseFloat(sizeSlider.value);
-      const targetPressure = Math.max(0.15, Math.min(1, 1 - speed * 0.5));
+    canvas.addEventListener('pointermove', (e) => {
+      if (!isDrawing) return;
 
-      currentPressure += (targetPressure - currentPressure) * 0.2;
-      const lineWidth = baseSize * currentPressure;
+      const pressure = e.pressure || 0.5; // 真實筆壓，滑鼠時為 0.5
+      const size = parseFloat(sizeSlider.value) * pressure;
 
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.strokeStyle = 'black';
-      ctx.lineWidth = lineWidth;
+      ctx.lineWidth = size;
 
       ctx.beginPath();
       ctx.moveTo(lastX, lastY);
-      ctx.lineTo(x, y);
+      ctx.lineTo(e.offsetX, e.offsetY);
       ctx.stroke();
 
-      lastX = x;
-      lastY = y;
-      lastTime = now;
-    }
-
-    function stopDrawing(x = lastX, y = lastY) {
-      if (isDrawing) {
-        const dx = x - prevX;
-        const dy = y - prevY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 2) {
-          const dotSize = parseFloat(sizeSlider.value) * 0.6;
-          ctx.beginPath();
-          ctx.arc(x, y, dotSize / 2, 0, Math.PI * 2);
-          ctx.fillStyle = 'black';
-          ctx.fill();
-        }
-      }
-      isDrawing = false;
-    }
-
-    canvas.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      startDrawing(e.offsetX, e.offsetY);
+      [lastX, lastY] = [e.offsetX, e.offsetY];
     });
 
-    canvas.addEventListener('pointermove', e => {
-      if (!isDrawing) return;
-      e.preventDefault();
-      drawLine(e.offsetX, e.offsetY);
-    });
-
-    canvas.addEventListener('pointerup', e => stopDrawing(e.offsetX, e.offsetY));
-    canvas.addEventListener('pointerout', e => stopDrawing(e.offsetX, e.offsetY));
-
-    canvas.addEventListener('touchstart', e => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const [x, y] = getCanvasPos(touch);
-      startDrawing(x, y);
-    });
-
-    canvas.addEventListener('touchmove', e => {
-      if (!isDrawing) return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      const [x, y] = getCanvasPos(touch);
-      drawLine(x, y);
-    });
-
-    canvas.addEventListener('touchend', e => {
-      const touch = e.changedTouches[0];
-      const [x, y] = getCanvasPos(touch);
-      stopDrawing(x, y);
-    });
+    const stopDraw = () => isDrawing = false;
+    canvas.addEventListener('pointerup', stopDraw);
+    canvas.addEventListener('pointerout', stopDraw);
+    canvas.addEventListener('pointercancel', stopDraw);
 
     document.getElementById('btn-save').addEventListener('click', () => {
       const link = document.createElement('a');
-      link.download = 'handwriting.png';
+      link.download = 'calligraphy.png';
       link.href = canvas.toDataURL();
       link.click();
     });
@@ -166,3 +96,5 @@
   </script>
 </body>
 </html>
+
+
